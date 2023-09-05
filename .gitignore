@@ -1,0 +1,12 @@
+*.pyc
+__pycache__/
+.DS_Store
+._*
+*.csv
+.idea/
+*.log
+*.pt
+*.zip
+*.txt
+*.json
+!RO/ro2_pars.csv
