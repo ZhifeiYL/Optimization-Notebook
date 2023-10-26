@@ -1,0 +1,130 @@
+
+* End of data input. Actual model starts
+Parameter Rsup /0/;
+
+Qh(i,h) = tabHs(i, h);
+Qc(i,c) = tabCs(i, c);
+
+* ==============================================================================
+
+NonNegative Variables
+Q(h,c,i) Heat transferred from hot stream h to cold stream c via interval i
+Qht(ht,i) Heat transferred from hot utility stream into interval i
+Qct(ct,i) Heat transferred to cold utility stream from interval i
+;
+
+Nonnegative Variables
+R(h,i) An indexed variable with respect to intervalsQs(i)
+;
+
+R.fx(h,i)$(ord(i) = card(i)) = 0;
+
+Binary Variables
+y(h,c,i)    If heat can transfer from h to c via interval i
+x(h,c)      If a heat exchanger exists between h and c
+
+Nonnegative Variables
+cost
+;
+
+Free Variables
+z;
+
+loop((ht, i),
+    Qht.fx(ht,i)$(not valid_combinations_ht(ht,i)) = 0;
+);
+
+loop((ct, i),
+    Qct.fx(ct,i)$(not valid_combinations_ct(ct,i)) = 0;
+);
+
+* ==============================================================================
+* Base model
+
+Equations
+HB_hs(hs,i)        heat balance for interval i w.r.t hot stream hs
+HB_ht(ht, i)       heat balance for interval i w.r.t heat utility ht
+HB_c(cs,i)         heat balance for interval i w.r.t cold stream cs
+HB_ct(ct, i)       heat balance for interval i w.r.t cold utility ct
+;
+
+HB_hs(hs, i)..
+sum(c, Q(hs,c,i)) + R(hs,i) =e= Qh(i,hs)
+                            + R(hs,i-1)$(not (ord(i) eq 1))
+                            +  Rsup$(ord(i) eq 1);
+
+HB_ht(ht, i)..
+sum(c, Q(ht,c,i)) + R(ht,i) =e= Qht(ht,i)
+                            + R(ht,i-1)$(not (ord(i) eq 1))
+                            +  Rsup$(ord(i) eq 1);
+
+HB_c(cs, i)..
+sum(h, Q(h, cs, i)) =e= Qc(i, cs);
+
+HB_ct(ct, i)..
+sum(h, Q(h, ct, i)) =e= Qct(ct, i);
+
+model base_model /all/;
+
+* ==============================================================================
+* LP transshipment
+
+Equations
+obj1;
+
+obj1..
+z =e= sum(ht, sum(i, Cm(ht) * Qht(ht, i)))
+        + sum(ct, sum(i, Cn(ct) * Qct(ct, i)));
+
+
+model heat_lp /base_model, obj1/;
+
+option optcr = 0;
+option mip=cplex;
+solve heat_lp minimizing z using lp;
+
+* ==============================================================================
+* MILP transportation
+
+Parameter
+M(h,c,i)
+;
+
+Qht.fx(ht,i) = Qht.l(ht, i);
+Qct.fx(ct,i) = Qct.l(ct, i);
+
+loop(valid_combinations_ht(ht, i),
+    Qh(i, ht) = Qht.l(ht, i);
+)
+
+loop(valid_combinations_ct(ct, i),
+    Qc(i, ct) = Qct.l(ct, i);
+)
+
+loop((h,c,i),
+    M(h,c,i) = min(sum(ip, Qh(ip,h)), sum(ip, Qc(ip,c)));
+);
+
+Equations
+
+heat_trans(h,c,i)   if heat can transfer from h to c via interval i
+heat_exch(h,c)      if a heat exchanger exists between h and c
+obj2
+;
+
+heat_trans(h,c,i)..
+sum(ip, Q(h,c,ip)) - M(h,c,i) *  y(h,c,i) =l= 0;
+
+
+heat_exch(h,c)..
+sum(i, y(h,c,i)) - card(i)*x(h,c) =l= 0;
+
+obj2..
+z =e= sum(h, sum(c, x(h,c)));
+
+model heat_milp /base_model, heat_trans, heat_exch, obj2/;
+
+solve heat_milp minimizing z using mip;
+
+* ==============================================================================
+* export data
