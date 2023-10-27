@@ -10,3 +10,10 @@ __pycache__/
 *.txt
 *.json
 !RO/ro2_pars.csv
+heat_integration/heat_transportation/example_hw7_2/*
+!heat_integration/heat_transportation/example_hw7_2/streams.csv
+!heat_integration/heat_transportation/example_hw7_2/tabH.csv
+!heat_integration/heat_transportation/example_hw7_2/tabC.csv
+!heat_integration/heat_transportation/example_hw7_2/utility_interval.csv
+!heat_integration/heat_transportation/example_hw7_2/utility_cost.csv
+!heat_integration/heat_transportation/example_hw7_2/model_body.txt
