@@ -15,8 +15,8 @@ def _compress_code(code: str) -> str:
 
     for line in lines:
         line = line.strip()  # Remove leading and trailing whitespace
-        # line = re.sub(r'\s*([=+\-*/(,)])\s*', r'\1', line)  # Remove spaces around operators and brackets
-        # compressed_lines.append(line)
+        line = re.sub(r'\s*([=+\-*/(,)])\s*', r'\1', line)  # Remove spaces around operators and brackets
+        compressed_lines.append(line)
     compressed_code = ' '.join(compressed_lines)
     return compressed_code
 
@@ -28,6 +28,5 @@ def compress_file_from_txt(input_filename: str, output_filename: str):
 
     with open(output_filename, 'w') as file:
         file.write(compressed_code)
-
 
 
