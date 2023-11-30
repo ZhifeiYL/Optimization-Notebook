@@ -9,6 +9,8 @@ __pycache__/
 *.zip
 *.txt
 *.json
+/surrogate/plastic_train1/train1_data/collect_file.ipynb
+/surrogate/plastic_train2/train2_data/collect_file.ipynb
 !RO/ro2_pars.csv
 heat_integration/heat_transportation/example_hw7_2/*
 !heat_integration/heat_transportation/example_hw7_2/streams.csv
