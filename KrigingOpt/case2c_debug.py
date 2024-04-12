@@ -1,5 +1,6 @@
 import numpy as np
 import chaospy as cp
+import GPy
 from sklearn.linear_model import LarsCV, LassoLarsCV
 
 from stochastic_kriging import SimpleStochasticKriging, UK
@@ -24,6 +25,8 @@ X_train = X
 Y_train = np.mean(Y, axis=1, keepdims=True)
 V_train = np.var(Y, axis=1, keepdims=True)
 
+gp_model = GPy.models.GPRegression(X, Y, GPy.kern.RBF(input_dim=1, variance=1., lengthscale=1.))
+gp_model.optimize(messages=False)
 
 def rbf_kernel(x1, x2, pars):
     sigma_f, length_scale = pars
@@ -45,13 +48,13 @@ def optimize_pce(pce_expansion, data):
     pce_expansion_ = pce_expansion[coeffs != 0]
     return pce
 
-pck = UK()
+pcsk = UK()
 distribution = cp.Uniform(0, 10)
 expansion = cp.generate_expansion(20, distribution, normed=True)
-pck.set_trend(expansion)
-pck.fit_trend(optimize_pce, [X_train.reshape(-1,), Y_train.reshape(-1,)])
-pck.kernel = rbf_kernel
-pck.train(X_train, Y_train, V_train)
+pcsk.set_trend(expansion)
+pcsk.fit_trend(optimize_pce, [X_train.reshape(-1,), Y_train.reshape(-1,)])
+pcsk.kernel = rbf_kernel
+pcsk.train(X_train, Y_train, V_train)
 
 # First try to plot prediction of the mean, mse with the true function
 
@@ -73,10 +76,13 @@ def calculate_nmae(y_true, y_pred):
 
 
 all_models = dict()
-all_models["SK_"+str(50) + "_" + str(20)] = sk
+all_models["Kriging_"+str(100) + "_" + str(10)] = gp_model
+all_models["SK_"+str(100) + "_" + str(10)] = sk
+all_models["PCSK_"+str(100) + "_" + str(10)] = pcsk
 
 
-def perform_analysis(n_validate, metric_function, f_true, seed=None):
+
+def perform_analysis(n_validate, metric_functions, f_true, seed=None):
     if seed is not None:
         np.random.seed(seed)
 
@@ -88,7 +94,7 @@ def perform_analysis(n_validate, metric_function, f_true, seed=None):
 
     # Dictionary to store predictions and errors
     predictions = {}
-    metrics = {}
+    metrics_set = [dict() for _ in range(len(metric_functions))]
 
     # Iterate over each model and evaluate
     for n, model in all_models.items():
@@ -96,13 +102,14 @@ def perform_analysis(n_validate, metric_function, f_true, seed=None):
         Y_pred, Y_var = model.predict(X_validate)
 
         # Calculate the error using the provided metric function
-        metric = metric_function(Y_validate, Y_pred)
+        metrics = [metric_function(Y_validate, Y_pred) for metric_function in metric_functions]
 
         # Store results
         predictions[n] = Y_pred
-        metrics[n] = metric
+        for i in range(len(metrics)):
+            metrics_set[i][n] = metrics[i]
 
-    return X_validate, predictions, metrics
+    return X_validate, predictions, metrics_set
 
 # 100 trails for replications
 # 1e5 points for each validation trial
@@ -111,26 +118,29 @@ seeds = []
 n_validation = int(1e5)
 
 # Store the results for each seed
-all_metrics = {}
+all_metrics1 = {}
+all_metrics2 = {}
 all_predictions = {}
 all_X_validations = {}
 
-# Example of iterating over 50 seeds
+# Example for ermse
 for i in range(num_seeds):
-    seed = np.random.randint(0, 10000)  # Generate a random seed
+    seed = np.random.randint(0, 100000)  # Generate a random seed
     seeds.append(seed)
-    X_validation, predictions, metrics = perform_analysis(n_validation, calculate_ermse, f_true, seed=seed)
+    X_validation, predictions, metrics = perform_analysis(n_validation, [calculate_ermse, calculate_nmae], f_true, seed=seed)
 
     # Store the results
-    all_metrics[seed] = metrics
+    all_metrics1[seed] = metrics[0]
+    all_metrics2[seed] = metrics[1]
     all_predictions[seed] = predictions
     all_X_validations[seed] = X_validation
 
-scenarios = ["SK_"+str(50) + "_" + str(20)]
+# scenarios: keys to all models
+scenarios = all_models.keys()
 
 data_runs = [[] for _ in range(len(scenarios))]  # Adjust 'len(scenarios)' to the actual number of scenarios you have
 
-for metrics in all_metrics.values():
+for metrics in all_metrics1.values():
     for i, n in enumerate(scenarios):
         data_runs[i].append(metrics[n])
 
